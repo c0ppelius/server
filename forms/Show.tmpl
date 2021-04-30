@@ -1,0 +1,9 @@
+{{ define "Show" }}
+  {{ template "Header" }}
+    {{ template "Menu"  }}
+    <h2> Talk </h2>
+      <p>Speaker: {{ .Speaker }}</p>
+      <p>Date : {{ .Date }}</p>
+      <p>Title:  {{ .Title }}</p><br /> <a href="/edit?id={{ .Id }}">Edit</a></p>
+  {{ template "Footer" }}
+{{ end }}

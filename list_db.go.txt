@@ -20,14 +20,14 @@
 // func main() {
 //     tmpl := template.Must(template.ParseFiles("display.html"))
 
-//     database, err := sql.Open("sqlite3","./nraboy.db")
+//     database, err := sql.Open("sqlite3","./talks.db")
 //     if err != nil {
 //         log.Fatal(err)
 //     }
 
 //     defer database.Close() 
 
-//     rows, err := database.Query("SELECT id, firstname, lastname FROM people")
+//     rows, err := database.Query("SELECT id, speaker, title FROM talk")
 //     if err != nil {
 //         log.Fatal(err)
 //     }
@@ -35,14 +35,14 @@
 //     Talks := []Talk{}
 
 //     var id int
-//     var firstname string 
-//     var lastname string
+//     var speaker string 
+//     var title string
 
 //     for rows.Next() {
-//         rows.Scan(&id, &firstname, &lastname)
+//         rows.Scan(&id, &speaker, &title)
 //         talk := Talk {
-//             Speaker: firstname,
-//             Title: lastname,
+//             Speaker: speaker,
+//             Title: title,
 //         }
 //         Talks = append(Talks,talk)
 //     }
