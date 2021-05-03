@@ -7,6 +7,7 @@ import (
     "net/http"
     "text/template"
     "time"
+    "math/rand"
 
     _ "github.com/mattn/go-sqlite3"
 )
@@ -24,13 +25,10 @@ func dbOpen(file string) (db *sql.DB) {
     if err != nil {
         log.Fatal(err)
     }
-    statement, err := db.Prepare("CREATE TABLE IF NOT EXISTS talks (id INTEGER PRIMARY KEY, month INTEGER, day INTEGER, year INTEGER, hour INTEGER, minute INTEGER, speaker TEXT, title TEXT)")
-		if err != nil {
-			log.Fatal(err)
-		}
-    statement.Exec()
     return db
 }
+
+const layout = "2006-01-02 15:04:05"
 
 var tmpl = template.Must(template.ParseGlob("forms/*"))
 
@@ -138,7 +136,7 @@ func Insert(w http.ResponseWriter, r *http.Request) {
         log.Println("INSERT: Name: " + speaker + " | Title: " + title)
     }
     defer db.Close()
-    http.Redirect(w, r, "/", 301  )
+    http.Redirect(w, r, "/", http.StatusSeeOther  )
 }
 
 func Update(w http.ResponseWriter, r *http.Request) {
@@ -158,7 +156,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
         log.Println("UPDATE: Name: " + speaker + " | Title: " + title)
     }
     defer db.Close()
-    http.Redirect(w, r, "/", 301)
+    http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func Delete(w http.ResponseWriter, r *http.Request) {
@@ -208,19 +206,136 @@ func ConfirmDelete(w http.ResponseWriter, r *http.Request) {
     delForm.Exec(nId)
     log.Println("DELETE")
     defer db.Close()
-    http.Redirect(w, r, "/", 301 )
+    http.Redirect(w, r, "/", http.StatusSeeOther )
+}
+
+func convert_date(exp_date string) time.Time {
+	dt_typed, err := time.Parse(layout, exp_date)
+    if err != nil{
+        log.Fatal(err)
+    }
+    return dt_typed
+}
+
+func check_token(token string) bool {
+    var result bool
+    if len(token) != 24 {
+        result = false
+    } else {
+        var token2, exp_date string
+        db := dbOpen("tokens")
+        defer db.Close()
+        err := db.QueryRow("SELECT * FROM tokens WHERE token=?", token).Scan(&token2,&exp_date)
+        if err == sql.ErrNoRows {
+            result = false
+        } else if err != nil {
+            log.Fatal(err)
+        } else {
+            exp_time := convert_date(exp_date)
+            if exp_time.After(time.Now()) {
+                result = false
+            }
+            result = true
+        }
+    }
+    return result
+}
+
+func auth(handler http.HandlerFunc) http.HandlerFunc {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        user_token := r.URL.Query().Get("token")
+        fmt.Println(user_token)
+        fmt.Println(r)
+        if check_token(user_token) {
+            handler.ServeHTTP(w,r)
+        } else {
+            fmt.Println("Uh oh")
+            http.Redirect(w,r,"/login", http.StatusUnauthorized)
+        }
+    })
+}
+
+const charset = "abcdefghijklmnopqrstuvwxyz" +
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+var seededRand *rand.Rand = rand.New(
+  rand.NewSource(time.Now().UnixNano()))
+
+func StringWithCharset(length int, charset string) string {
+  b := make([]byte, length)
+  for i := range b {
+    b[i] = charset[seededRand.Intn(len(charset))]
+  }
+  return string(b)
+}
+
+func String(length int) string {
+  return StringWithCharset(length, charset)
+}
+
+func Login(w http.ResponseWriter, r *http.Request) {
+    tmpl.ExecuteTemplate(w,"Login",nil)
+}
+
+func Attempt(w http.ResponseWriter, r *http.Request) {
+    user_token := r.URL.Query().Get("token")
+    if check_token(user_token) {
+        http.Redirect(w, r, "/", http.StatusSeeOther)
+    } else {
+        var authenticate bool
+        users := dbOpen("users")
+        var user, pw string 
+        defer users.Close()
+        if r.Method == "POST" {
+            current_user := r.FormValue("user")
+            current_pw := r.FormValue("password")
+            err := users.QueryRow("SELECT * FROM users WHERE user=?", current_user).Scan(&user,&pw)
+            if err == sql.ErrNoRows {
+                fmt.Println("No user here")
+                authenticate = false
+            } else if err != nil {
+                log.Fatal(err)
+            } else {
+                if current_pw == pw {
+                    authenticate = true
+                } else {
+                    fmt.Println(current_pw)
+                    fmt.Println(pw)
+                    fmt.Println("Passwords don't match")
+                    authenticate = false
+                }
+            }
+        }
+        if authenticate {
+            fmt.Println("Boom.")
+            tokens := dbOpen("tokens")
+            defer tokens.Close()
+            token := String(24)
+            date := (time.Now().AddDate(0,0,1)).Format(layout)
+            insForm, err := tokens.Prepare("INSERT INTO tokens(token,exp_date) VALUES(?,?)")
+            if err != nil {
+                log.Fatal(err)
+            }
+            insForm.Exec(token,date)
+            http.Redirect(w, r, "/?token="+token, http.StatusSeeOther)
+        } else {
+            http.Redirect(w, r, "/", http.StatusSeeOther)
+        }
+    }
 }
 
 func main() {
     port := ":2000"
     log.Println("Server started on: http://localhost"+port)
-    http.HandleFunc("/", Index)
-    http.HandleFunc("/show", Show)
-    http.HandleFunc("/new", New)
-    http.HandleFunc("/edit", Edit)
-    http.HandleFunc("/insert", Insert)
-    http.HandleFunc("/update", Update)
-    http.HandleFunc("/delete", Delete)
+    http.HandleFunc("/", auth(Index))
+    http.HandleFunc("/login", Login)
+    http.HandleFunc("/attempt", Attempt)
+    http.HandleFunc("/show", auth(Show))
+    http.HandleFunc("/new", auth(New))
+    http.HandleFunc("/edit", auth(Edit))
+    http.HandleFunc("/insert", auth(Insert))
+    http.HandleFunc("/update", auth(Update))
+    http.HandleFunc("/delete", auth(Delete))
     http.HandleFunc("/confirmdeletionbesure", ConfirmDelete)
     err := http.ListenAndServe(port, nil)
     if err != nil {

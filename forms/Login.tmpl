@@ -1,0 +1,11 @@
+{{ define "Login" }}
+  {{ template "Header" }}
+    {{ template "Menu" }} 
+   <h2>Please Authenticate</h2>  
+    <form method="POST" action="attempt">
+        <label> Username </label><input type="text" name="user"" required><br />
+        <label> Password </label><input type="text" name="password" required><br />
+      <input type="submit" value="Submit" />
+    </form><br />    
+  {{ template "Footer" }}
+{{ end }}
