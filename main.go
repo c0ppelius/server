@@ -136,7 +136,7 @@ func Insert(w http.ResponseWriter, r *http.Request) {
         log.Println("INSERT: Name: " + speaker + " | Title: " + title)
     }
     defer db.Close()
-    http.Redirect(w, r, "/", http.StatusSeeOther  )
+    tmpl.ExecuteTemplate(w,"Insert",nil)
 }
 
 func Update(w http.ResponseWriter, r *http.Request) {
@@ -156,7 +156,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
         log.Println("UPDATE: Name: " + speaker + " | Title: " + title)
     }
     defer db.Close()
-    http.Redirect(w, r, "/", http.StatusSeeOther)
+    tmpl.ExecuteTemplate(w,"Update",nil)
 }
 
 func Delete(w http.ResponseWriter, r *http.Request) {
@@ -206,7 +206,7 @@ func ConfirmDelete(w http.ResponseWriter, r *http.Request) {
     delForm.Exec(nId)
     log.Println("DELETE")
     defer db.Close()
-    http.Redirect(w, r, "/", http.StatusSeeOther )
+    tmpl.ExecuteTemplate(w,"ConfirmDelete",nil)
 }
 
 func convert_date(exp_date string) time.Time {
@@ -243,7 +243,7 @@ func check_token(token string) bool {
 
 func auth(handler http.HandlerFunc) http.HandlerFunc {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        user_token := r.URL.Query().Get("token")
+        user_token := r.Header.Get("scagnt-authorization")
         fmt.Println(user_token)
         fmt.Println(r)
         if check_token(user_token) {
@@ -278,9 +278,9 @@ func Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func Attempt(w http.ResponseWriter, r *http.Request) {
-    user_token := r.URL.Query().Get("token")
+    user_token := r.Header.Get("scagnt-authorization")
     if check_token(user_token) {
-        http.Redirect(w, r, "/", http.StatusSeeOther)
+        tmpl.ExecuteTemplate(w,"Success",nil)
     } else {
         var authenticate bool
         users := dbOpen("users")
@@ -317,7 +317,10 @@ func Attempt(w http.ResponseWriter, r *http.Request) {
                 log.Fatal(err)
             }
             insForm.Exec(token,date)
-            http.Redirect(w, r, "/?token="+token, http.StatusSeeOther)
+            fmt.Println(token)
+            r.Header.Add("scagnt-authorization",token)
+            fmt.Println(r.Header.Get("scagnt-authorization"))
+            tmpl.ExecuteTemplate(w,"Success",nil)
         } else {
             http.Redirect(w, r, "/", http.StatusSeeOther)
         }
