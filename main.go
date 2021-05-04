@@ -30,7 +30,7 @@ func dbOpen(file string) (db *sql.DB) {
 
 const layout = "2006-01-02 15:04:05"
 
-var tmpl = template.Must(template.ParseGlob("forms/*"))
+var tmpl = template.Must(template.ParseGlob("/home/pi/forms/*"))
 
 var trash = Talk{}
 
@@ -243,13 +243,17 @@ func check_token(token string) bool {
 
 func auth(handler http.HandlerFunc) http.HandlerFunc {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        user_token := r.Header.Get("scagnt-authorization")
-        fmt.Println(user_token)
-        fmt.Println(r)
+        // user_token := r.Header.Get("scagnt-authorization")
+        var user_token string 
+        cookie, err := r.Cookie("scagnt")
+        if err == nil {
+            user_token = cookie.Value
+        } else { 
+            user_token = ""
+        }
         if check_token(user_token) {
             handler.ServeHTTP(w,r)
         } else {
-            fmt.Println("Uh oh")
             http.Redirect(w,r,"/login", http.StatusUnauthorized)
         }
     })
@@ -278,7 +282,14 @@ func Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func Attempt(w http.ResponseWriter, r *http.Request) {
-    user_token := r.Header.Get("scagnt-authorization")
+    // user_token := r.Header.Get("scagnt-authorization")
+    var user_token string 
+    cookie, err := r.Cookie("scagnt")
+    if err == nil {
+        user_token = cookie.Value
+    } else { 
+        user_token = ""
+    }
     if check_token(user_token) {
         tmpl.ExecuteTemplate(w,"Success",nil)
     } else {
@@ -307,19 +318,21 @@ func Attempt(w http.ResponseWriter, r *http.Request) {
             }
         }
         if authenticate {
-            fmt.Println("Boom.")
             tokens := dbOpen("tokens")
             defer tokens.Close()
             token := String(24)
-            date := (time.Now().AddDate(0,0,1)).Format(layout)
+            expire := time.Now().AddDate(0,0,1) 
+            date := expire.Format(layout)
             insForm, err := tokens.Prepare("INSERT INTO tokens(token,exp_date) VALUES(?,?)")
             if err != nil {
                 log.Fatal(err)
             }
             insForm.Exec(token,date)
-            fmt.Println(token)
-            r.Header.Add("scagnt-authorization",token)
-            fmt.Println(r.Header.Get("scagnt-authorization"))
+            cookie := &http.Cookie {
+                Name: "scagnt",
+                Value: token,
+            }
+            http.SetCookie(w,cookie)
             tmpl.ExecuteTemplate(w,"Success",nil)
         } else {
             http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -328,7 +341,7 @@ func Attempt(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-    port := ":2000"
+    port := ":8080"
     log.Println("Server started on: http://localhost"+port)
     http.HandleFunc("/", auth(Index))
     http.HandleFunc("/login", Login)
