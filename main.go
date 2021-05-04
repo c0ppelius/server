@@ -1,42 +1,61 @@
 package main
 
 import (
-    "database/sql"
-    "fmt"
-    "log"
-    "net/http"
-    "text/template"
-    "time"
-    "math/rand"
+	"database/sql"
+	"fmt"
+	"log"
+	"math/rand"
+	"net/http"
+	"text/template"
+	"time"
+    "strconv"
+    "strings"
 
-    _ "github.com/mattn/go-sqlite3"
+	// "github.com/gobwas/glob/util/strings"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Talk struct {
-    Id      int
-    Date    string 
-    Speaker string
-    Title   string
+    Id              int
+    Date            time.Time 
+    Year            string
+    Month           string
+    Month_name      string
+    Day             string
+    Date_string     string
+    Time_string     string
+    Speaker_first   string
+    Speaker_last    string
+    Speaker_url     string
+    Affiliation     string
+    Title           string
+    Abstract        string
+    Vid_conf_url    string
+    Vid_conf_pw     string
+    Recording_url   string
 }
 
 func dbOpen(file string) (db *sql.DB) {
     dbDriver := "sqlite3"
-    db, err := sql.Open(dbDriver,file+".db")
+    db, err := sql.Open(dbDriver,prefix+file+".db")
     if err != nil {
         log.Fatal(err)
     }
     return db
 }
 
+// const prefix = "/home/pi/"
+const prefix = ""
+
 const layout = "2006-01-02 15:04:05"
 
-var tmpl = template.Must(template.ParseGlob("/home/pi/forms/*"))
+var tmpl = template.Must(template.ParseGlob(prefix+"forms/*"))
 
 var trash = Talk{}
 
 func Index(w http.ResponseWriter, r *http.Request) {
     db := dbOpen("talks")
-    rows, err := db.Query("SELECT * FROM talks ORDER BY id DESC")
+    rows, err := db.Query("SELECT * FROM scagnt ORDER BY id DESC")
     if err != nil {
         log.Fatal(err)
     }
@@ -44,16 +63,43 @@ func Index(w http.ResponseWriter, r *http.Request) {
     talks := []Talk{}
     for rows.Next() {
         var id int
-        var month, day, year, hour, minute int 
-        var speaker, title string
-        err = rows.Scan(&id, &month, &day, &year, &hour, &minute, &speaker, &title)
+        var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url string
+        err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url)
         if err != nil {
             log.Fatal(err)
         }
         talk.Id = id
-        talk.Date = time.Date(year, time.Month(month), day, hour, minute, 0, 0, time.UTC).Format("Jan 02 2006")
-        talk.Speaker = speaker
+        s := strings.Split(event_time,"-")
+        if len(s[0]) == 4 {
+            s[0] = "0"+s[0]
+        }
+        event_time = s[0]
+        string_time := event_date+"T"+event_time+":00.000Z"
+        converted_time, err := time.Parse("2006-01-02T15:04:05.000Z",string_time)
+        if err != nil {
+            log.Fatal(err)
+        }
+        talk.Date = converted_time
+        talk.Date_string = talk.Date.Format("January 02 2006") 
+        talk.Year = strconv.Itoa(converted_time.Year())
+        month_num := strconv.Itoa(int(converted_time.Month()))
+        if len(month_num) == 1 {
+            talk.Month = "0"+month_num
+        } else {
+            talk.Month = strconv.Itoa(int(converted_time.Month()))
+        }
+        talk.Month_name = talk.Date.Format("January")
+        talk.Day = strconv.Itoa(converted_time.Day())
+        talk.Time_string = converted_time.Format("15:04")
+        talk.Speaker_first = speaker_first
+        talk.Speaker_last = speaker_last
+        talk.Speaker_url = speaker_url
+        talk.Affiliation = speaker_affiliation
         talk.Title = title
+        talk.Abstract = abstract
+        talk.Vid_conf_url = vid_conf_url
+        talk.Vid_conf_pw = vid_conf_pw
+        talk.Recording_url = recording_url
         talks = append(talks, talk)
     }
     tmpl.ExecuteTemplate(w, "Index", talks)
@@ -63,23 +109,51 @@ func Index(w http.ResponseWriter, r *http.Request) {
 func Show(w http.ResponseWriter, r *http.Request) {
     db := dbOpen("talks")
     nId := r.URL.Query().Get("id")
-    rows, err := db.Query("SELECT * FROM talks WHERE id=?", nId)
+    rows, err := db.Query("SELECT * FROM scagnt WHERE id=?", nId)
     if err != nil {
         log.Fatal(err)
     }
     talk := Talk{}
     for rows.Next() {
         var id int
-        var month, day, year, hour, minute int 
-        var speaker, title string
-        err = rows.Scan(&id, &month, &day, &year, &hour, &minute, &speaker, &title)
+        var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url string
+        err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url)
         if err != nil {
             log.Fatal(err)
         }
+        fmt.Println(speaker_url)
         talk.Id = id
-        talk.Date = time.Date(year, time.Month(month), day, hour, minute, 0, 0, time.UTC).Format("Jan 02 2006")
-        talk.Speaker = speaker
+        s := strings.Split(event_time,"-")
+        if len(s[0]) == 4 {
+            s[0] = "0"+s[0]
+        }
+        event_time = s[0]
+        string_time := event_date+"T"+event_time+":00.000Z"
+        converted_time, err := time.Parse("2006-01-02T15:04:05.000Z",string_time)
+        if err != nil {
+            log.Fatal(err)
+        }
+        talk.Date = converted_time
+        talk.Date_string = talk.Date.Format("January 02 2006")
+        talk.Year = strconv.Itoa(converted_time.Year())
+        month_num := strconv.Itoa(int(converted_time.Month()))
+        if len(month_num) == 1 {
+            talk.Month = "0"+month_num
+        } else {
+            talk.Month = strconv.Itoa(int(converted_time.Month()))
+        }
+        talk.Month_name = talk.Date.Format("January")
+        talk.Day = strconv.Itoa(converted_time.Day())
+        talk.Time_string = converted_time.Format("15:04")
+        talk.Speaker_first = speaker_first
+        talk.Speaker_last = speaker_last
+        talk.Affiliation = speaker_affiliation
         talk.Title = title
+        talk.Abstract = abstract
+        talk.Speaker_url = speaker_url
+        talk.Vid_conf_url = vid_conf_url
+        talk.Vid_conf_pw = vid_conf_pw
+        talk.Recording_url = recording_url
     }
     tmpl.ExecuteTemplate(w, "Show", talk)
     defer db.Close()
@@ -92,23 +166,50 @@ func New(w http.ResponseWriter, r *http.Request) {
 func Edit(w http.ResponseWriter, r *http.Request) {
     db := dbOpen("talks")
     nId := r.URL.Query().Get("id")
-    rows, err := db.Query("SELECT * FROM talks WHERE id=?", nId)
+    rows, err := db.Query("SELECT * FROM scagnt WHERE id=?", nId)
     if err != nil {
         log.Fatal(err)
     }
     talk := Talk{}
     for rows.Next() {
         var id int
-        var month, day, year, hour, minute int 
-        var speaker, title string
-        err = rows.Scan(&id, &month, &day, &year, &hour, &minute, &speaker, &title)
+        var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url string
+        err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url)
         if err != nil {
             log.Fatal(err)
         }
         talk.Id = id
-        talk.Date = time.Date(year, time.Month(month), day, hour, minute, 0, 0, time.UTC).Format("Jan 02 2006")
-        talk.Speaker = speaker
+        s := strings.Split(event_time,"-")
+        if len(s[0]) == 4 {
+            s[0] = "0"+s[0]
+        }
+        event_time = s[0]
+        string_time := event_date+"T"+event_time+":00.000Z"
+        converted_time, err := time.Parse("2006-01-02T15:04:05.000Z",string_time)
+        if err != nil {
+            log.Fatal(err)
+        }
+        talk.Date = converted_time
+        talk.Date_string = talk.Date.Format("January 02 2006")
+        talk.Year = strconv.Itoa(converted_time.Year())
+        month_num := strconv.Itoa(int(converted_time.Month()))
+        if len(month_num) == 1 {
+            talk.Month = "0"+month_num
+        } else {
+            talk.Month = strconv.Itoa(int(converted_time.Month()))
+        }
+        talk.Month_name = talk.Date.Format("January")
+        talk.Day = strconv.Itoa(converted_time.Day())
+        talk.Time_string = converted_time.Format("15:04")
+        talk.Speaker_first = speaker_first
+        talk.Speaker_last = speaker_last
+        talk.Affiliation = speaker_affiliation
         talk.Title = title
+        talk.Abstract = abstract
+        talk.Speaker_url = speaker_url
+        talk.Vid_conf_url = vid_conf_url
+        talk.Vid_conf_pw = vid_conf_pw
+        talk.Recording_url = recording_url
     }
     tmpl.ExecuteTemplate(w, "Edit", talk)
     defer db.Close()
@@ -117,23 +218,37 @@ func Edit(w http.ResponseWriter, r *http.Request) {
 func Insert(w http.ResponseWriter, r *http.Request) {
     db := dbOpen("talks")
     if r.Method == "POST" {
-        speaker := r.FormValue("speaker")
-        if speaker == "" {
-            speaker = "Reserved"
+        speaker_first := r.FormValue("speaker_first")
+        if speaker_first == "" {
+            speaker_first = "Reserved"
         }
+        speaker_last := r.FormValue("speaker_last")
+        event_time := r.FormValue("time")
+        speaker_url := r.FormValue("speaker_url")
+        speaker_affiliation := r.FormValue("speaker_affiliation")
+        vid_conf_url := r.FormValue("vid_conf_url")
+        vid_conf_pw := r.FormValue("vid_conf_pw")
+        recording_url := r.FormValue("recording_url")
         title := r.FormValue("title")
+        abstract := r.FormValue("abstract")
         if title == "" {
             title = "TBA"
         }
         month := r.FormValue("month")
         day := r.FormValue("day")
+        if len(day) == 1 {
+            day = "0"+day
+        }
         year := r.FormValue("year")
-        insForm, err := db.Prepare("INSERT INTO talks(month,day,year,hour,minute,speaker,title) VALUES(?,?,?,?,?,?,?)")
+        event_date := year+"-"+month+"-"+day
+        fmt.Println("Ok up to prepare")
+        insForm, err := db.Prepare("INSERT INTO scagnt (event_date, time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
         if err != nil {
             log.Fatal(err)
         }
-        insForm.Exec(month, day, year, 0, 0, speaker, title)
-        log.Println("INSERT: Name: " + speaker + " | Title: " + title)
+        fmt.Println("After prepare?")
+        insForm.Exec(event_date,event_time,speaker_first,speaker_last,speaker_url,speaker_affiliation,title,abstract,vid_conf_url, vid_conf_pw, recording_url)
+        log.Println("INSERT: Name: " + speaker_first + " " + speaker_last + " | Title: " + title)
     }
     defer db.Close()
     tmpl.ExecuteTemplate(w,"Insert",nil)
@@ -142,18 +257,34 @@ func Insert(w http.ResponseWriter, r *http.Request) {
 func Update(w http.ResponseWriter, r *http.Request) {
     db := dbOpen("talks")
     if r.Method == "POST" {
-        speaker := r.FormValue("speaker")
+        id := r.FormValue("uid")
+        speaker_first := r.FormValue("speaker_first")
+        if speaker_first == "" {
+            speaker_first = "Reserved"
+        }
+        speaker_last := r.FormValue("speaker_last")
+        event_time := r.FormValue("time")
+        speaker_url := r.FormValue("speaker_url")
+        speaker_affiliation := r.FormValue("speaker_affiliation")
+        vid_conf_url := r.FormValue("vid_conf_url")
+        vid_conf_pw := r.FormValue("vid_conf_pw")
+        recording_url := r.FormValue("recording_url")
         title := r.FormValue("title")
+        abstract := r.FormValue("abstract")
+        if title == "" {
+            title = "TBA"
+        }
         month := r.FormValue("month")
         day := r.FormValue("day")
         year := r.FormValue("year")
-        id := r.FormValue("uid")
-        insForm, err := db.Prepare("UPDATE talks SET month=?, day=?, year=?, hour=?, minute=?, speaker=?, title=? WHERE id=?")
+        event_date := year+"-"+month+"-"+day
+        insForm, err := db.Prepare("UPDATE scagnt SET event_date=?, time=?, speaker_first=? ,speaker_last=?, speaker_url=?, speaker_affiliation=?, title=?, abstract=?, vid_conf_url=?, vid_conf_pw=?, recording_url=? WHERE id=?")
+        fmt.Println("After preparing form data")
         if err != nil {
             log.Fatal(err)
         }
-        insForm.Exec(month, day, year, 0, 0, speaker, title, id)
-        log.Println("UPDATE: Name: " + speaker + " | Title: " + title)
+        insForm.Exec(event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, id)
+        log.Println("UPDATE: Name: " + speaker_first + " " + speaker_last + " | Title: " + title)
     }
     defer db.Close()
     tmpl.ExecuteTemplate(w,"Update",nil)
@@ -162,44 +293,72 @@ func Update(w http.ResponseWriter, r *http.Request) {
 func Delete(w http.ResponseWriter, r *http.Request) {
     db := dbOpen("talks")
     nId := r.URL.Query().Get("id")
-    rows, err := db.Query("SELECT * FROM talks WHERE id=?", nId)
+    rows, err := db.Query("SELECT * FROM scagnt WHERE id=?", nId)
     if err != nil {
         log.Fatal(err)
     }
     for rows.Next() {
         var id int
-        var month, day, year, hour, minute int 
-        var speaker, title string
-        err = rows.Scan(&id, &month, &day, &year, &hour, &minute, &speaker, &title)
+        var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url string
+        err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url)
         if err != nil {
             log.Fatal(err)
         }
         trash.Id = id
-        trash.Date = time.Date(year, time.Month(month), day, hour, minute, 0, 0, time.UTC).Format("Jan 02 2006")
-        trash.Speaker = speaker
+        s := strings.Split(event_time,"-")
+        if len(s[0]) == 4 {
+            s[0] = "0"+s[0]
+        }
+        fmt.Println(s[0])
+        event_time = s[0]
+        string_time := event_date+"T"+event_time+":00.000Z"
+        converted_time, err := time.Parse("2006-01-02T15:04:05.000Z",string_time)
+        if err != nil {
+            log.Fatal(err)
+        }
+        trash.Date = converted_time
+        trash.Date_string = trash.Date.Format("January 02 2006")
+        trash.Year = strconv.Itoa(converted_time.Year())
+        month_num := strconv.Itoa(int(converted_time.Month()))
+        if len(month_num) == 1 {
+            trash.Month = "0"+month_num
+        } else {
+            trash.Month = strconv.Itoa(int(converted_time.Month()))
+        }
+        trash.Month_name = trash.Date.Format("January")
+        trash.Day = strconv.Itoa(converted_time.Day())
+        trash.Time_string = converted_time.Format("15:04")
+        trash.Speaker_first = speaker_first
+        trash.Speaker_last = speaker_last
+        trash.Affiliation = speaker_affiliation
         trash.Title = title
+        trash.Abstract = abstract
+        trash.Speaker_url = speaker_url
+        trash.Vid_conf_url = vid_conf_url
+        trash.Vid_conf_pw = vid_conf_pw
+        trash.Recording_url = recording_url
     }
     tmpl.ExecuteTemplate(w, "Delete", trash)
     defer db.Close()
 }
 
 func ConfirmDelete(w http.ResponseWriter, r *http.Request) {
-    bin := dbOpen("trash")
-    statement, err := bin.Prepare("CREATE TABLE IF NOT EXISTS talks (id INTEGER PRIMARY KEY, month INTEGER, day INTEGER, year INTEGER, hour INTEGER, minute INTEGER, speaker TEXT, title TEXT)")
-    if err != nil {
-        log.Fatal(err)
-    }
-    statement.Exec()
-    // insForm, err := bin.Prepare("INSERT INTO talks(month,day,year,hour,minute,speaker,title) VALUES(?,?,?,?,?,?,?)")
+    // bin := dbOpen("trash")
+    // statement, err := bin.Prepare("CREATE TABLE scagnt (id INTEGER PRIMARY KEY, event_date TEXT, time TEXT, speaker_first TEXT, speaker_last TEXT, speaker_url TEXT, speaker_affiliation TEXT, title TEXT, abstract TEXT, vid_conf_url TEXT, vid_conf_pw TEXT, recording_url TEXT)")
     // if err != nil {
     //     log.Fatal(err)
     // }
-    // insForm.Exec(trash.Month, trash.Day, trash.year, 0, 0, trash.speaker, trash.title)
-    // log.Println("INSERT: Name: " + trash.speaker + " | Title: " + trash.title)
+    // statement.Exec()
+    // // insForm, err := bin.Prepare("INSERT INTO talks(month,day,year,hour,minute,speaker,title) VALUES(?,?,?,?,?,?,?)")
+    // // if err != nil {
+    // //     log.Fatal(err)
+    // // }
+    // // insForm.Exec(trash.Month, trash.Day, trash.year, 0, 0, trash.speaker, trash.title)
+    // // log.Println("INSERT: Name: " + trash.speaker + " | Title: " + trash.title)
 
     db := dbOpen("talks")
     nId := r.URL.Query().Get("id")
-    delForm, err := db.Prepare("DELETE FROM talks WHERE id=?")
+    delForm, err := db.Prepare("DELETE FROM scagnt WHERE id=?")
     if err != nil {
         log.Fatal(err)
     }

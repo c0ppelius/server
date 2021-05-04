@@ -2,8 +2,16 @@
   {{ template "Header" }}
     {{ template "Menu"  }}
     <h2> Talk </h2>
-      <p>Speaker: {{ .Speaker }}</p>
-      <p>Date : {{ .Date }}</p>
-      <p>Title:  {{ .Title }}</p><br /> <a href="/edit?id={{ .Id }}">Edit</a></p>
+      <p>Speaker: {{ .Speaker_first }} {{ .Speaker_last }} </p>
+      <p>Affiliation: {{ .Affiliation }}</p>
+      <p>Speaker's Webpage: {{ .Speaker_url }}</p>
+      <p>Date : {{ .Date_string }}</p>
+      <p>Time : {{ .Time_string }}</p>
+      <p>Title:  {{ .Title }}</p> 
+      <p>Abstract: {{ .Abstract }}</p>
+      <p>Video Conferencing : {{ .Vid_conf_url }}</p>
+      <p>Video Conferencing Password: {{ .Vid_conf_pw }}</p>
+      <p>Recording URL: {{ .Recording_url }}</p>
+      <a href="/edit?id={{ .Id }}">Edit</a></p>
   {{ template "Footer" }}
 {{ end }}

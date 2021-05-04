@@ -3,27 +3,38 @@
     {{ template "Menu" }} 
    <h2>New Talk</h2>  
     <form method="POST" action="insert">
-        <label> Speaker </label><input type="text" name="speaker" /><br />
-        <label> Title </label><input type="text" name="title" /><br />
+        <label> Speaker First Name </label><input type="text" name="speaker_first" required><br />
+        <label> Speaker Last Name </label><input type="text" name="speaker_last" required><br />
+        <label> Title </label><input type="text" name="title" required><br />
         <label for="months">Month:</label>
             <select id="month" name="month" required>
-                <option value="1">January</option>
-                <option value="2">February</option>
-                <option value="3">March</option>
-                <option value="4">April</option>
-                <option value="5">May</option>
-                <option value="6">June</option>
-                <option value="7">July</option>
-                <option value="8">August</option>
-                <option value="9">September</option>
+                <option value="01">January</option>
+                <option value="02">February</option>
+                <option value="03">March</option>
+                <option value="04">April</option>
+                <option value="05">May</option>
+                <option value="06">June</option>
+                <option value="07">July</option>
+                <option value="08">August</option>
+                <option value="09">September</option>
                 <option value="10">October</option>
                 <option value="11">November</option>
                 <option value="12">December</option>
             </select><br />
-        <label for="quantity">Day (between 1 and 31):</label>
+        <label for="quantity">Day:</label>
         <input type="number" id="day" name="day" min="1" max="31" required><br />
-        <label for="quantity">Year (between 2010 and 2030):</label>
-        <input type="number" id="year" name="year" min="2010" max="2030" required><br />
+        <label for="quantity">Year:</label>
+        <input type="number" id="year" name="year" min="2010" max="2030"" required><br />
+        <label for="time">Time:</label> <input type="time" id="time" name="time" min="09:00" max="20:00" required><br />
+        <label> Abstract </label><br />
+        <textarea rows = "6" cols = "50" name="abstract">
+          {{ .Abstract }}
+         </textarea><br />
+        <label> Speaker Webpage </label><input type="text" name="speaker_url" ><br />
+        <label> Speaker Affiliation </label><input type="text" name="speaker_affiliation" ><br />
+        <label> Video Conferencing URL </label><input type="text" name="vid_conf_url" ><br />
+        <label> Video Conferencing Password </label><input type="text" name="vid_conf_pw" ><br />
+        <label> Recording URL </label><input type="text" name="recording_url" ><br />
         <input type="submit" value="Save talk" />
     </form>
   {{ template "Footer" }}

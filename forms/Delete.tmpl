@@ -2,10 +2,9 @@
   {{ template "Header" }}
     {{ template "Menu"  }}
         <h2> You are about to delete the following talk: </h2>
-            <p>Speaker: {{ .Speaker }}</p>
-            <p>Date : {{ .Date }}</p>
+            <p>Speaker: {{ .Speaker_first }} {{ .Speaker_last }} </p>
+            <p>Date : {{ .Date_string }}</p>
             <p>Title:  {{ .Title }}</p><br>
-
             <p> If this is a mistake, then go back <a href="/">Home</a>. Otherwise, to confirm please click <a href="/confirmdeletionbesure?id={{ .Id }}">Delete</a></p>
   {{ template "Footer" }}
 {{ end }}

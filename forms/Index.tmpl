@@ -5,7 +5,6 @@
     <table>
       <thead>
       <tr>
-        <td>ID</td>
         <td>Date</td>
         <td>Speaker</td>
         <td>Title</td>
@@ -17,9 +16,8 @@
        <tbody>
     {{ range . }}
       <tr>
-        <td>{{ .Id }}</td>
-        <td>{{ .Date }}</td>
-        <td> {{ .Speaker }} </td>
+        <td>{{ .Date_string }}</td>
+        <td> {{ .Speaker_first }} {{ .Speaker_last }}</td>
         <td>{{ .Title }} </td> 
         <td><a href="/show?id={{ .Id }}">View</a></td>
         <td><a href="/edit?id={{ .Id }}">Edit</a></td>
