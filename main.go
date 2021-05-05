@@ -47,10 +47,10 @@ func dbOpen(file string) (db *sql.DB) {
     return db
 }
 
-// const prefix = "/home/pi/"
-const prefix = ""
+const prefix = "/home/server/"
+// const prefix = ""
 
-const port = ":2000"
+const port = ":8080"
 
 const layout = "2006-01-02 15:04:05"
 
@@ -61,7 +61,7 @@ var trash = Talk{}
 func PrependHTTP (url string) string {
     if len(url) == 0 {
         return url 
-    } else if (url[0:7] != "http://") &&ca (url[0:8] != "https://") {
+    } else if (url[0:7] != "http://") && (url[0:8] != "https://") {
         return "http://"+url 
     } else {
         return url 
@@ -524,6 +524,12 @@ func main() {
         log.Fatal(err)
     }
     log.SetOutput(file)
+    // srv := &http.Server{
+    //     ReadTimeout:  5 * time.Second,
+    //     WriteTimeout: 10 * time.Second,
+    //     IdleTimeout:  120 * time.Second,
+    // }
+    
     fmt.Println("Server started")
     log.Println("Server started on: http://localhost"+port)
     http.HandleFunc("/", auth(Index))
