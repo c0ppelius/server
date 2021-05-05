@@ -1,7 +1,7 @@
 {{ define "Index" }}
   {{ template "Header" }}
     {{ template "Menu"  }}
-    <h2> Current Talks </h2>
+    <h2> Upcoming Talks </h2>
     <table>
       <thead>
       <tr>
@@ -15,6 +15,7 @@
        </thead>
        <tbody>
     {{ range . }}
+    {{ if .Upcoming }}
       <tr>
         <td>{{ .Date_string }}</td>
         <td> {{ .Speaker_first }} {{ .Speaker_last }}</td>
@@ -23,6 +24,36 @@
         <td><a href="/edit?id={{ .Id }}">Edit</a></td>
         <td><a href="/delete?id={{ .Id }}">Delete</a></td>
       </tr>
+    {{ end }}
+    {{ end }}
+       </tbody>
+    </table>
+
+    <h2> Past Talks </h2>
+    <table>
+      <thead>
+      <tr>
+        <td>Date</td>
+        <td>Speaker</td>
+        <td>Title</td>
+        <td>View</td>
+        <td>Edit</td>
+        <td>Delete</td>
+      </tr>
+       </thead>
+       <tbody>
+    {{ range . }}
+    {{ if .Upcoming }}
+    {{ else }}
+      <tr>
+        <td>{{ .Date_string }}</td>
+        <td> {{ .Speaker_first }} {{ .Speaker_last }}</td>
+        <td>{{ .Title }} </td> 
+        <td><a href="/show?id={{ .Id }}">View</a></td>
+        <td><a href="/edit?id={{ .Id }}">Edit</a></td>
+        <td><a href="/delete?id={{ .Id }}">Delete</a></td>
+      </tr>
+    {{ end }}
     {{ end }}
        </tbody>
     </table>

@@ -10,6 +10,8 @@ import (
 	"time"
     "strconv"
     "strings"
+    "sort"
+    "os"
 
 	// "github.com/gobwas/glob/util/strings"
 	_ "github.com/mattn/go-sqlite3"
@@ -18,6 +20,7 @@ import (
 type Talk struct {
     Id              int
     Date            time.Time 
+    Upcoming        bool
     Year            string
     Month           string
     Month_name      string
@@ -47,11 +50,23 @@ func dbOpen(file string) (db *sql.DB) {
 // const prefix = "/home/pi/"
 const prefix = ""
 
+const port = ":2000"
+
 const layout = "2006-01-02 15:04:05"
 
 var tmpl = template.Must(template.ParseGlob(prefix+"forms/*"))
 
 var trash = Talk{}
+
+func PrependHTTP (url string) string {
+    if len(url) == 0 {
+        return url 
+    } else if (url[0:7] != "http://") &&ca (url[0:8] != "https://") {
+        return "http://"+url 
+    } else {
+        return url 
+    }
+}
 
 func Index(w http.ResponseWriter, r *http.Request) {
     db := dbOpen("talks")
@@ -80,6 +95,7 @@ func Index(w http.ResponseWriter, r *http.Request) {
             log.Fatal(err)
         }
         talk.Date = converted_time
+        talk.Upcoming = converted_time.After(time.Now())
         talk.Date_string = talk.Date.Format("January 02 2006") 
         talk.Year = strconv.Itoa(converted_time.Year())
         month_num := strconv.Itoa(int(converted_time.Month()))
@@ -102,6 +118,9 @@ func Index(w http.ResponseWriter, r *http.Request) {
         talk.Recording_url = recording_url
         talks = append(talks, talk)
     }
+    sort.Slice(talks, func(i, j int) bool {
+        return talks[j].Date.Before(talks[i].Date)
+      })
     tmpl.ExecuteTemplate(w, "Index", talks)
     defer db.Close()
 }
@@ -121,7 +140,6 @@ func Show(w http.ResponseWriter, r *http.Request) {
         if err != nil {
             log.Fatal(err)
         }
-        fmt.Println(speaker_url)
         talk.Id = id
         s := strings.Split(event_time,"-")
         if len(s[0]) == 4 {
@@ -224,11 +242,11 @@ func Insert(w http.ResponseWriter, r *http.Request) {
         }
         speaker_last := r.FormValue("speaker_last")
         event_time := r.FormValue("time")
-        speaker_url := r.FormValue("speaker_url")
+        speaker_url := PrependHTTP(r.FormValue("speaker_url"))
         speaker_affiliation := r.FormValue("speaker_affiliation")
-        vid_conf_url := r.FormValue("vid_conf_url")
+        vid_conf_url := PrependHTTP(r.FormValue("vid_conf_url"))
         vid_conf_pw := r.FormValue("vid_conf_pw")
-        recording_url := r.FormValue("recording_url")
+        recording_url := PrependHTTP(r.FormValue("recording_url"))
         title := r.FormValue("title")
         abstract := r.FormValue("abstract")
         if title == "" {
@@ -241,12 +259,10 @@ func Insert(w http.ResponseWriter, r *http.Request) {
         }
         year := r.FormValue("year")
         event_date := year+"-"+month+"-"+day
-        fmt.Println("Ok up to prepare")
         insForm, err := db.Prepare("INSERT INTO scagnt (event_date, time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
         if err != nil {
             log.Fatal(err)
         }
-        fmt.Println("After prepare?")
         insForm.Exec(event_date,event_time,speaker_first,speaker_last,speaker_url,speaker_affiliation,title,abstract,vid_conf_url, vid_conf_pw, recording_url)
         log.Println("INSERT: Name: " + speaker_first + " " + speaker_last + " | Title: " + title)
     }
@@ -264,11 +280,11 @@ func Update(w http.ResponseWriter, r *http.Request) {
         }
         speaker_last := r.FormValue("speaker_last")
         event_time := r.FormValue("time")
-        speaker_url := r.FormValue("speaker_url")
+        speaker_url := PrependHTTP(r.FormValue("speaker_url"))
         speaker_affiliation := r.FormValue("speaker_affiliation")
-        vid_conf_url := r.FormValue("vid_conf_url")
+        vid_conf_url := PrependHTTP(r.FormValue("vid_conf_url"))
         vid_conf_pw := r.FormValue("vid_conf_pw")
-        recording_url := r.FormValue("recording_url")
+        recording_url := PrependHTTP(r.FormValue("recording_url"))
         title := r.FormValue("title")
         abstract := r.FormValue("abstract")
         if title == "" {
@@ -276,10 +292,12 @@ func Update(w http.ResponseWriter, r *http.Request) {
         }
         month := r.FormValue("month")
         day := r.FormValue("day")
+        if len(day) == 1 {
+            day = "0"+day
+        }
         year := r.FormValue("year")
         event_date := year+"-"+month+"-"+day
         insForm, err := db.Prepare("UPDATE scagnt SET event_date=?, time=?, speaker_first=? ,speaker_last=?, speaker_url=?, speaker_affiliation=?, title=?, abstract=?, vid_conf_url=?, vid_conf_pw=?, recording_url=? WHERE id=?")
-        fmt.Println("After preparing form data")
         if err != nil {
             log.Fatal(err)
         }
@@ -309,7 +327,6 @@ func Delete(w http.ResponseWriter, r *http.Request) {
         if len(s[0]) == 4 {
             s[0] = "0"+s[0]
         }
-        fmt.Println(s[0])
         event_time = s[0]
         string_time := event_date+"T"+event_time+":00.000Z"
         converted_time, err := time.Parse("2006-01-02T15:04:05.000Z",string_time)
@@ -338,6 +355,7 @@ func Delete(w http.ResponseWriter, r *http.Request) {
         trash.Vid_conf_pw = vid_conf_pw
         trash.Recording_url = recording_url
     }
+    log.Println("Pending deletion: "+trash.Speaker_first+" "+trash.Speaker_last+" | "+trash.Title)
     tmpl.ExecuteTemplate(w, "Delete", trash)
     defer db.Close()
 }
@@ -459,6 +477,7 @@ func Attempt(w http.ResponseWriter, r *http.Request) {
         if r.Method == "POST" {
             current_user := r.FormValue("user")
             current_pw := r.FormValue("password")
+            log.Println("Authentication attempt:"+current_user+" "+current_pw)
             err := users.QueryRow("SELECT * FROM users WHERE user=?", current_user).Scan(&user,&pw)
             if err == sql.ErrNoRows {
                 fmt.Println("No user here")
@@ -469,9 +488,9 @@ func Attempt(w http.ResponseWriter, r *http.Request) {
                 if current_pw == pw {
                     authenticate = true
                 } else {
-                    fmt.Println(current_pw)
-                    fmt.Println(pw)
-                    fmt.Println("Passwords don't match")
+                    log.Println(current_pw)
+                    log.Println(pw)
+                    log.Println("Passwords don't match")
                     authenticate = false
                 }
             }
@@ -500,7 +519,12 @@ func Attempt(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-    port := ":8080"
+    file, err := os.OpenFile("logs", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.SetOutput(file)
+    fmt.Println("Server started")
     log.Println("Server started on: http://localhost"+port)
     http.HandleFunc("/", auth(Index))
     http.HandleFunc("/login", Login)
@@ -512,8 +536,8 @@ func main() {
     http.HandleFunc("/update", auth(Update))
     http.HandleFunc("/delete", auth(Delete))
     http.HandleFunc("/confirmdeletionbesure", ConfirmDelete)
-    err := http.ListenAndServe(port, nil)
+    err = http.ListenAndServe(port, nil)
     if err != nil {
-        fmt.Println(err)
+        log.Fatal(err)
     }
 }
