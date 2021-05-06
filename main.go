@@ -14,7 +14,8 @@ import (
     "os"
 
 	// "github.com/gobwas/glob/util/strings"
-	_ "github.com/mattn/go-sqlite3"
+	// _ "github.com/mattn/go-sqlite3"
+    _ "modernc.org/sqlite"
 )
 
 type Talk struct {
@@ -39,7 +40,7 @@ type Talk struct {
 }
 
 func dbOpen(file string) (db *sql.DB) {
-    dbDriver := "sqlite3"
+    dbDriver := "sqlite"
     db, err := sql.Open(dbDriver,prefix+file+".db")
     if err != nil {
         log.Fatal(err)
