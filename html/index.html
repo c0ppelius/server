@@ -1,0 +1,169 @@
+<!doctype html PUBLIC "-//W3C//DTD XHTML 1.0 strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"> 
+  <head>
+	 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+
+     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.13.0/dist/katex.min.css" integrity="sha384-t5CR+zwDAROtph0PXGte6ia8heboACF9R5l/DiY+WZ3P2lxNgvJkQk5n7GPvLMYw" crossorigin="anonymous">
+
+    <!-- The loading of KaTeX is deferred to speed up page rendering -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.13.0/dist/katex.min.js" integrity="sha384-FaFLTlohFghEIZkw6VGwmf9ISTubWAVYW8tG8+w2LAIftJEULZABrF9PPFv+tVkH" crossorigin="anonymous"></script>
+
+    <!-- To automatically render math in text elements, include the auto-render extension: -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.13.0/dist/contrib/auto-render.min.js" integrity="sha384-bHBqxz8fokvgoJ/sc17HODNxa42TlaEhB+w8ZJXTc2nZf1VgEaFZeZvT4Mznfz0v" crossorigin="anonymous"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            renderMathInElement(document.body, {
+                // customised options
+                // • auto-render specific keys, e.g.:
+                delimiters: [
+                    {left: "$$", right: "$$", display: true},
+                    {left: "$", right: "$", display: false},
+                    {left: "\\(", right: "\\)", display: false},
+                    {left: "\\begin{equation}", right: "\\end{equation}", display: true},
+                    {left: "\\begin{align}", right: "\\end{align}", display: true},
+                    {left: "\\begin{alignat}", right: "\\end{alignat}", display: true},
+                    {left: "\\begin{gather}", right: "\\end{gather}", display: true},
+                    {left: "\\begin{CD}", right: "\\end{CD}", display: true},
+                    {left: "\\[", right: "\\]", display: true}
+                    ],
+                // • rendering keys, e.g.:
+                throwOnError : false
+            });
+        });
+    </script>
+
+	 <title>University of South Carolina - Algebra, Geometry, and Number Theory Seminar</title>
+     <link href="css/style.css" rel="stylesheet" type="text/css" media="screen" />
+  </head>
+  <body>
+	 <div id="logo">
+		 <div><h1>Algebra, Geometry, and Number Theory Seminar</h1></div><br/>
+		 <div><h2>
+		<a href="http://www.math.sc.edu">Department of Mathematics</a><br/>
+		<a href="http://www.sc.edu">University of South Carolina</a>
+    </h2></div>
+	 </div>
+	 <!-- start page -->
+	 <div id="page">
+		<!-- start content -->
+		<div id="fullcontent">
+
+<p align="center"><font size="+1"><i>Fall 2021</i></font></p>
+<hr/>
+
+<br/>
+<font size="+1">
+<p align="center">
+<b>We are actively monitoring the status of the COVID-19 pandemic.</b>
+</p>
+
+<p> We are hopeful that in-person talks will be possible for this semester. 
+  The location for these talks will be provided when they are feasible. 
+</p>
+<p>
+  Regardless, we still expect to have virtual talks. For security reasons, 
+  meeting info will be shared via the group's <a href="http://scagnt.zulipchat.com">Zulip server</a>.
+
+  If you want to join the Zulip server, or want the meeting information 
+  for a particular talk, contact 
+  <a href="mailto:duncan@math.sc.edu">
+	Alex Duncan</a>.</p>
+</font>
+<br/>
+
+<hr>
+
+<br/>
+
+<center>
+<table border="0" cellspacing="5">
+    <thead>
+        <tr>
+            <td width="15%"><b> <u>Date</u> </b></td>
+            <td width="25%"><b> <u>Speaker</u> </b></td>
+            <td width="40%"><b> <u>Title</u> </b></td>
+            <td width="10%"><b> <u>Host</u> </b></td>
+        </tr>
+    </thead>
+
+    <tbody>
+    
+    <tr><td> Friday, Aug 20 <br> 3:30PM </td>
+        <td><b><a href="http://www.adamtopaz.com">Adam Topaz</a></b><br>University of Alberta</td>
+        <td><a href="#Topaz">An overview of the Liquid Tensor Experiment</a></td>
+        <td>Matthew Ballard</td></tr>    
+    
+    <tr><td> Friday, Oct 22 <br> 3:30PM </td>
+        <td><b><a href="https://people.math.sc.edu/thornef/">Frank Thorne</a></b><br>University of South Carolina</td>
+        <td><a href="#Thorne">Arithmetic Statistics via Fourier Analysis</a></td>
+        <td>local</td></tr>    
+    
+    <tr><td> Friday, Oct 29 <br> 3:30PM </td>
+        <td><b><a href="https://people.math.sc.edu/shaoyun/">Shaoyun Yi</a></b><br>University of South Carolina</td>
+        <td><a href="#Yi">On dimensions of the spaces of Siegel modular forms</a></td>
+        <td>(local)</td></tr>    
+    
+    <tr><td> Friday, Nov 19 <br> 3:30PM </td>
+        <td><b>Alex Kalogirou</b><br></td>
+        <td><a href="#Kalogirou">TBA</a></td>
+        <td></td></tr>    
+     
+    </tbody>
+</table>
+
+<br>
+
+<hr>
+
+<p align="center"><font size="+1">Abstracts</font></p>
+
+
+<p id="Topaz" align="left">  <b>Adam Topaz</b> - <b>An overview of the Liquid Tensor Experiment</b></p>
+
+<p align="left">
+The liquid tensor experiment (LTE) was initiated in December 2020 with a challenge by P. Scholze to formalize and verify a foundational result from his work with D. Clausen on analytic geometry in the context of condensed mathematics. This challenge was immediately taken up by several members of the lean interactive theorem prover community, and, six months later, the key technical core of the Clausen-Scholze result was formally verified by this group. In this talk, I will give an overview of LTE, lean, and its mathematics library. No previous experience with condensed mathematics and/or interactive theorem provers will be necessary for this talk.
+
+There will be a pretalk at 2:30 introducing the Lean Theorem Prover.  
+</p>
+
+
+<p id="Thorne" align="left">  <b>Frank Thorne</b> - <b>Arithmetic Statistics via Fourier Analysis</b></p>
+
+<p align="left">
+I will give an overview of "Bhargava's averaging method", a lattice point counting method developed by Manjul Bhargava which yields a variety of results in arithmetic statistics. I will then outline a variant which incorporates Fourier analysis and improves the resulting error terms.
+
+This is joint work with Tess Anderson and Manjul Bhargava. 
+</p>
+
+
+<p id="Yi" align="left">  <b>Shaoyun Yi</b> - <b>On dimensions of the spaces of Siegel modular forms</b></p>
+
+<p align="left">
+In this talk, we present new dimension formulas of Siegel cusp forms of degree 2 for certain congruence subgroups of level 4. To obtain these desired dimension formulas, we will explore the connection between Siegel cusp forms of degree 2 and cuspidal automorphic representation of GSp(4). This is joint work with Manami Roy and Ralf Schmidt. 
+</p>
+
+
+<p id="Kalogirou" align="left">  <b>Alex Kalogirou</b> - <b>TBA</b></p>
+
+<p align="left">
+TBA 
+</p>
+
+
+<br/>
+<hr/>
+<p align="center"><a href="2021/spring">Last semester's seminar.</a>
+</p>
+
+        </div>
+        <!-- end content -->
+
+    </div>
+    <!-- end page -->
+
+    <!-- start bottom bar -->
+    <div id="bottombar">
+    </div>
+</body>
+</html>

@@ -37,7 +37,7 @@
         <label> Video Conferencing URL </label><input type="text" name="vid_conf_url" value="{{ .Vid_conf_url }}"><br />
         <label> Video Conferencing Password </label><input type="text" name="vid_conf_pw" value="{{ .Vid_conf_pw }}"><br />
         <label> Recording URL </label><input type="text" name="recording_url" value="{{ .Recording_url }}"><br />
-        <label> Host </label><input type="text" name="host" ><br />
+        <label> Host </label><input type="text" name="host" value="{{ .Host }}"><br />
         <input type="submit" value="Save talk" />
     </form><br />    
   {{ template "Footer" }}

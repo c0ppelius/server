@@ -49,11 +49,11 @@ func dbOpen(file string) (db *sql.DB) {
 	return db
 }
 
-const prefix = "/home/server/"
+// const prefix = "/home/server/"
 
-// const prefix = ""
+const prefix = ""
 
-const term_start = "2021-08-23 00:00:00"
+const term_start = "2021-08-15 00:00:00"
 const term_end = "2022-01-01 00:00:00"
 
 const port = ":8080"
@@ -74,7 +74,60 @@ func PrependHTTP(url string) string {
 	}
 }
 
-func WriteToHTML(talks []Talk) {
+func WriteToHTML() {
+	db := dbOpen("talks")
+	rows, err := db.Query("SELECT * FROM scagnt ORDER BY id DESC")
+	if err != nil {
+		log.Fatal(err)
+	}
+	talk := Talk{}
+	talks := []Talk{}
+	for rows.Next() {
+		var id int
+		var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, host string
+		err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url, &host)
+		if err != nil {
+			log.Fatal(err)
+		}
+		talk.Id = id
+		s := strings.Split(event_time, "-")
+		if len(s[0]) == 4 {
+			s[0] = "0" + s[0]
+		}
+		event_time = s[0]
+		string_time := event_date + "T" + event_time + ":00.000Z"
+		converted_time, err := time.Parse("2006-01-02T15:04:05.000Z", string_time)
+		if err != nil {
+			log.Fatal(err)
+		}
+		talk.Date = converted_time
+		talk.Upcoming = converted_time.After(time.Now())
+		talk.Date_string = talk.Date.Format("January 02 2006")
+		talk.Year = strconv.Itoa(converted_time.Year())
+		month_num := strconv.Itoa(int(converted_time.Month()))
+		if len(month_num) == 1 {
+			talk.Month = "0" + month_num
+		} else {
+			talk.Month = strconv.Itoa(int(converted_time.Month()))
+		}
+		talk.Month_name = talk.Date.Format("January")
+		talk.Day = strconv.Itoa(converted_time.Day())
+		talk.Time_string = converted_time.Format("15:04")
+		talk.Speaker_first = speaker_first
+		talk.Speaker_last = speaker_last
+		talk.Speaker_url = speaker_url
+		talk.Affiliation = speaker_affiliation
+		talk.Title = title
+		talk.Abstract = abstract
+		talk.Vid_conf_url = vid_conf_url
+		talk.Vid_conf_pw = vid_conf_pw
+		talk.Recording_url = recording_url
+		talk.Host = host
+		talks = append(talks, talk)
+	}
+	sort.Slice(talks, func(i, j int) bool {
+		return talks[j].Date.After(talks[i].Date)
+	})
 	start_date, _ := time.Parse(layout, term_start)
 	end_date, _ := time.Parse(layout, term_end)
 	current_talks := []Talk{}
@@ -84,36 +137,43 @@ func WriteToHTML(talks []Talk) {
 		}
 	}
 	type page_talk_data struct {
-		date         string
-		time         string
-		url          string
-		speaker      string
-		speaker_last string
-		uni          string
-		title        string
-		host         string
-		abstract     string
+		Date         string
+		Time         string
+		URL          string
+		Speaker      string
+		Speaker_last string
+		Uni          string
+		Title        string
+		Host         string
+		Abstract     string
 	}
 	page_data := []page_talk_data{}
 	for _, talk := range current_talks {
 		talk_data := page_talk_data{}
-		talk_data.date = talk.Date.Format("Monday, Jan 2")
-		talk_data.time = talk.Date.Format("3:04PM")
-		talk_data.url = talk.Speaker_url
-		talk_data.speaker = talk.Speaker_first + " " + talk.Speaker_last
-		talk_data.speaker_last = talk.Speaker_last
-		talk_data.uni = talk.Affiliation
-		talk_data.title = talk.Title
-		talk_data.host = talk.Host
-		talk_data.abstract = talk.Abstract
+		talk_data.Date = talk.Date.Format("Monday, Jan 2")
+		talk_data.Time = talk.Date.Format("3:04PM")
+		talk_data.URL = talk.Speaker_url
+		talk_data.Speaker = talk.Speaker_first + " " + talk.Speaker_last
+		talk_data.Speaker_last = talk.Speaker_last
+		talk_data.Uni = talk.Affiliation
+		talk_data.Title = talk.Title
+		talk_data.Host = talk.Host
+		talk_data.Abstract = talk.Abstract
 		page_data = append(page_data, talk_data)
+	}
+	// path := prefix + "/forms/Seminar_Page.tmpl"
+	path := "./html/Seminar_Page.html"
+	t, err := template.ParseFiles(path)
+	if err != nil {
+		log.Print(err)
+		return
 	}
 	f, err := os.Create("./html/index.html")
 	if err != nil {
 		log.Println("create file: ", err)
 		return
 	}
-	err = tmpl.Execute(f, page_data)
+	err = t.Execute(f, page_data)
 	if err != nil {
 		log.Print("execute: ", err)
 		return
@@ -131,8 +191,8 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	talks := []Talk{}
 	for rows.Next() {
 		var id int
-		var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url string
-		err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url)
+		var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, host string
+		err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url, &host)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -188,8 +248,8 @@ func Show(w http.ResponseWriter, r *http.Request) {
 	talk := Talk{}
 	for rows.Next() {
 		var id int
-		var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url string
-		err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url)
+		var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, host string
+		err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url, &host)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -225,12 +285,14 @@ func Show(w http.ResponseWriter, r *http.Request) {
 		talk.Vid_conf_url = vid_conf_url
 		talk.Vid_conf_pw = vid_conf_pw
 		talk.Recording_url = recording_url
+		talk.Host = host
 	}
 	tmpl.ExecuteTemplate(w, "Show", talk)
 	defer db.Close()
 }
 
 func New(w http.ResponseWriter, r *http.Request) {
+	WriteToHTML()
 	tmpl.ExecuteTemplate(w, "New", nil)
 }
 
@@ -322,6 +384,7 @@ func Insert(w http.ResponseWriter, r *http.Request) {
 		log.Println("INSERT: Name: " + speaker_first + " " + speaker_last + " | Title: " + title)
 	}
 	defer db.Close()
+	WriteToHTML()
 	tmpl.ExecuteTemplate(w, "Insert", nil)
 }
 
@@ -361,6 +424,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
 		log.Println("UPDATE: Name: " + speaker_first + " " + speaker_last + " | Title: " + title)
 	}
 	defer db.Close()
+	WriteToHTML()
 	tmpl.ExecuteTemplate(w, "Update", nil)
 }
 
@@ -373,8 +437,8 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	for rows.Next() {
 		var id int
-		var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url string
-		err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url)
+		var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, host string
+		err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url, &host)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -410,6 +474,7 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 		trash.Vid_conf_url = vid_conf_url
 		trash.Vid_conf_pw = vid_conf_pw
 		trash.Recording_url = recording_url
+		trash.Host = host
 	}
 	log.Println("Pending deletion: " + trash.Speaker_first + " " + trash.Speaker_last + " | " + trash.Title)
 	tmpl.ExecuteTemplate(w, "Delete", trash)
@@ -439,6 +504,7 @@ func ConfirmDelete(w http.ResponseWriter, r *http.Request) {
 	delForm.Exec(nId)
 	log.Println("DELETE")
 	defer db.Close()
+	WriteToHTML()
 	tmpl.ExecuteTemplate(w, "ConfirmDelete", nil)
 }
 
