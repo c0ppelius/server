@@ -1,0 +1,11 @@
+[Unit]
+Description=SCAGNT data server
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5s
+ExecStart=/home/server/main
+
+[Install]
+WantedBy=multi-user.target

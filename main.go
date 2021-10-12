@@ -49,9 +49,9 @@ func dbOpen(file string) (db *sql.DB) {
 	return db
 }
 
-// const prefix = "/home/server/"
+const prefix = "/home/server/"
 
-const prefix = ""
+// const prefix = ""
 
 const term_start = "2021-08-15 00:00:00"
 const term_end = "2022-01-01 00:00:00"
@@ -161,14 +161,15 @@ func WriteToHTML() {
 		talk_data.Abstract = talk.Abstract
 		page_data = append(page_data, talk_data)
 	}
-	// path := prefix + "/forms/Seminar_Page.tmpl"
-	path := "./html/Seminar_Page.html"
+	path := prefix + "html/Seminar_Page.html"
+	// path := "./html/Seminar_Page.html"
 	t, err := template.ParseFiles(path)
 	if err != nil {
 		log.Print(err)
 		return
 	}
-	f, err := os.Create("./html/index.html")
+	index_path := prefix + "html/index.html"
+	f, err := os.Create(index_path)
 	if err != nil {
 		log.Println("create file: ", err)
 		return
