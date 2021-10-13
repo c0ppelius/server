@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	// "os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -180,6 +181,11 @@ func WriteToHTML() {
 		return
 	}
 	f.Close()
+	// out, err2 := exec.Command("/bin/bash", "/home/matt/gh_sync.sh").Output()
+	// if err2 != nil {
+	//	log.Fatal(err)
+	// }
+	// log.Print(out)
 }
 
 func Index(w http.ResponseWriter, r *http.Request) {
