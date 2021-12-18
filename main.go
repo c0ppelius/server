@@ -7,7 +7,9 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+
 	// "os/exec"
+	"flag"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,6 +20,49 @@ import (
 	// _ "github.com/mattn/go-sqlite3"
 	_ "modernc.org/sqlite"
 )
+
+var Term string
+var Year int
+
+func init() {
+	flag.StringVar(&Term, "term", "Fall", "Select 'Fall' or 'Spring'")
+	flag.IntVar(&Year, "year", 2021, "Select the year, eg 2022")
+}
+
+func check_year() {
+	if 2021 <= Year && Year <= 2030 {
+		return
+	} else {
+		log.Fatalln("Enter a reasonable year")
+	}
+}
+
+func check_term() {
+	if Term == "Fall" || Term == "Spring" {
+		return
+	} else {
+		log.Fatalln("Enter Fall or Spring for the term")
+	}
+}
+
+var term_start string
+var term_end string
+
+func set_term_start() {
+	if Term == "Fall" {
+		term_start = strconv.Itoa(Year) + "-08-01 00:00:00"
+	} else if Term == "Spring" {
+		term_start = strconv.Itoa(Year) + "-01-01 00:00:00"
+	}
+}
+
+func set_term_end() {
+	if Term == "Fall" {
+		term_end = strconv.Itoa(Year) + "-12-31 23:59:59"
+	} else if Term == "Spring" {
+		term_end = strconv.Itoa(Year) + "-05-30 00:00:00"
+	}
+}
 
 type Talk struct {
 	Id            int
@@ -53,9 +98,6 @@ func dbOpen(file string) (db *sql.DB) {
 const prefix = "/home/server/"
 
 // const prefix = ""
-
-const term_start = "2021-08-15 00:00:00"
-const term_end = "2022-01-01 00:00:00"
 
 const port = ":8080"
 
@@ -148,7 +190,12 @@ func WriteToHTML() {
 		Host         string
 		Abstract     string
 	}
-	page_data := []page_talk_data{}
+	type page_data struct {
+		Term  string
+		Year  string
+		Talks []page_talk_data
+	}
+	page_talks := []page_talk_data{}
 	for _, talk := range current_talks {
 		talk_data := page_talk_data{}
 		talk_data.Date = talk.Date.Format("Monday, Jan 2")
@@ -160,7 +207,13 @@ func WriteToHTML() {
 		talk_data.Title = talk.Title
 		talk_data.Host = talk.Host
 		talk_data.Abstract = talk.Abstract
-		page_data = append(page_data, talk_data)
+		page_talks = append(page_talks, talk_data)
+	}
+
+	data := page_data{
+		Term:  Term,
+		Year:  strconv.Itoa(Year),
+		Talks: page_talks,
 	}
 	path := prefix + "html/Seminar_Page.html"
 	// path := "./html/Seminar_Page.html"
@@ -175,7 +228,7 @@ func WriteToHTML() {
 		log.Println("create file: ", err)
 		return
 	}
-	err = t.Execute(f, page_data)
+	err = t.Execute(f, data)
 	if err != nil {
 		log.Print("execute: ", err)
 		return
@@ -648,6 +701,13 @@ func Attempt(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+
+	check_year() // check the year is between 2021 and 2030
+	check_term() // check the term is either 'Fall' or 'Spring'
+
+	set_term_start()
+	set_term_end()
+
 	file, err := os.OpenFile("logs", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatal(err)

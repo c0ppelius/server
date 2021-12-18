@@ -49,7 +49,7 @@
 		<!-- start content -->
 		<div id="fullcontent">
 
-<p align="center"><font size="+1"><i>Fall 2021</i></font></p>
+<p align="center"><font size="+1"><i>{{ .Term }} {{ .Year }}</i></font></p>
 <hr/>
 
 <br/>
@@ -88,7 +88,7 @@
     </thead>
 
     <tbody>
-    {{ range . }}
+    {{ range .Talks }}
     <tr><td> {{ .Date }} <br> {{ .Time }} </td>
         {{ if .URL -}}
             <td><b><a href="{{ .URL }}">{{ .Speaker }}</a></b>
