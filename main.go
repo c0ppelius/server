@@ -2,14 +2,15 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
-
-	// "os/exec"
-	"flag"
+	"os/exec"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,49 +22,79 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-var Term string
-var Year int
+const (
+	port   = ":8080"
+	layout = "2006-01-02 15:04:05"
+)
 
-func init() {
-	flag.StringVar(&Term, "term", "Fall", "Select 'Fall' or 'Spring'")
-	flag.IntVar(&Year, "year", 2021, "Select the year, eg 2022")
+// structure for receiving the user modifiable information
+type config_vars struct {
+	Term     string `json:"term"`
+	Year     int    `json:"year"`
+	RepoPath string `json:"repopath"`
 }
 
-func check_year() {
-	if 2021 <= Year && Year <= 2030 {
-		return
-	} else {
-		log.Fatalln("Enter a reasonable year")
-	}
-}
+var currentTerm string
+var currentYear int
 
-func check_term() {
-	if Term == "Fall" || Term == "Spring" {
-		return
-	} else {
-		log.Fatalln("Enter Fall or Spring for the term")
-	}
-}
+var lastTerm string
+var lastYear int
+
+var pathToBinary string
+var pathToRepo string
 
 var term_start string
 var term_end string
 
-func set_term_start() {
-	if Term == "Fall" {
-		term_start = strconv.Itoa(Year) + "-08-01 00:00:00"
-	} else if Term == "Spring" {
-		term_start = strconv.Itoa(Year) + "-01-01 00:00:00"
+// we want the program to know its path in the file system and to instantiate the term, year, and repo variables when called
+func init() {
+	e, _ := os.Executable()          // retrieves the path to the binary including the filename itself
+	pathToBinary = path.Dir(e) + "/" // strips the filename only
+	setTermsYearsRepoPath()
+}
+
+// this sets/resets the term, year, and path variables
+func setTermsYearsRepoPath() {
+	config := config_vars{}
+	configPath := pathToBinary + "config.json"
+	jsonFile, _ := os.Open(configPath)
+	file, _ := ioutil.ReadAll(jsonFile)
+	_ = json.Unmarshal(file, &config)
+	currentTerm = config.Term
+	currentYear = config.Year
+	pathToRepo = config.RepoPath
+	setLastTermandYear()
+	setTermStart()
+	setTermEnd()
+}
+
+func setLastTermandYear() {
+	if currentTerm == "Fall" {
+		lastTerm = "Spring"
+		lastYear = currentYear
+	} else if currentTerm == "Spring" {
+		lastTerm = "Fall"
+		lastYear = currentYear - 1
 	}
 }
 
-func set_term_end() {
-	if Term == "Fall" {
-		term_end = strconv.Itoa(Year) + "-12-31 23:59:59"
-	} else if Term == "Spring" {
-		term_end = strconv.Itoa(Year) + "-05-30 00:00:00"
+// converting term and year into layouts for time.Time
+func setTermStart() {
+	if currentTerm == "Fall" {
+		term_start = strconv.Itoa(currentYear) + "-08-01 00:00:00"
+	} else if currentTerm == "Spring" {
+		term_start = strconv.Itoa(currentYear) + "-01-01 00:00:00"
+	}
+}
+func setTermEnd() {
+	if currentTerm == "Fall" {
+		term_end = strconv.Itoa(currentYear) + "-12-31 23:59:59"
+	} else if currentTerm == "Spring" {
+		term_end = strconv.Itoa(currentYear) + "-05-30 00:00:00"
 	}
 }
 
+// struct for housing the relevant data of a talk
 type Talk struct {
 	Id            int
 	Date          time.Time
@@ -84,28 +115,24 @@ type Talk struct {
 	Vid_conf_pw   string
 	Recording_url string
 	Host          string
+	Location      string
 }
 
+// opens the datebase
 func dbOpen(file string) (db *sql.DB) {
 	dbDriver := "sqlite"
-	db, err := sql.Open(dbDriver, prefix+file+".db")
+	db, err := sql.Open(dbDriver, pathToBinary+file+".db")
 	if err != nil {
 		log.Fatal(err)
 	}
 	return db
 }
 
-const prefix = "/home/server/"
+// parse template files
+var tmpl = template.Must(template.ParseGlob(pathToBinary + "forms/*"))
 
-// const prefix = ""
-
-const port = ":8080"
-
-const layout = "2006-01-02 15:04:05"
-
-var tmpl = template.Must(template.ParseGlob(prefix + "forms/*"))
-
-var trash = Talk{}
+// trash talk to provide some protection against undesired deletion
+// var trash = Talk{}
 
 func PrependHTTP(url string) string {
 	if len(url) == 0 {
@@ -117,18 +144,14 @@ func PrependHTTP(url string) string {
 	}
 }
 
-func WriteToHTML() {
-	db := dbOpen("talks")
-	rows, err := db.Query("SELECT * FROM scagnt ORDER BY id DESC")
-	if err != nil {
-		log.Fatal(err)
-	}
+// helper function that reads a sql query result into a slice of talks
+func rowsToTalkSlice(rows *sql.Rows) (talksslice []Talk) {
 	talk := Talk{}
 	talks := []Talk{}
 	for rows.Next() {
 		var id int
-		var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, host string
-		err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url, &host)
+		var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, host, location string
+		err := rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url, &host, &location)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -166,8 +189,21 @@ func WriteToHTML() {
 		talk.Vid_conf_pw = vid_conf_pw
 		talk.Recording_url = recording_url
 		talk.Host = host
+		talk.Location = location
 		talks = append(talks, talk)
 	}
+	return talks
+}
+
+// reads the database into a slice of talks, converts to data for seminar page template, writes the resulting html to both the main index page and the relevant folder in the git repo, and finally calls the function to update the git repo
+func WriteToHTML() {
+	setTermsYearsRepoPath() // update term and year
+	db := dbOpen("talks")
+	rows, err := db.Query("SELECT * FROM scagnt ORDER BY id DESC")
+	if err != nil {
+		log.Fatal(err)
+	}
+	talks := rowsToTalkSlice(rows)
 	sort.Slice(talks, func(i, j int) bool {
 		return talks[j].Date.After(talks[i].Date)
 	})
@@ -189,11 +225,14 @@ func WriteToHTML() {
 		Title        string
 		Host         string
 		Abstract     string
+		Location     string
 	}
 	type page_data struct {
-		Term  string
-		Year  string
-		Talks []page_talk_data
+		Term         string
+		Year         string
+		LastTermPath string
+		Talks        []page_talk_data
+		Prefix       string
 	}
 	page_talks := []page_talk_data{}
 	for _, talk := range current_talks {
@@ -207,38 +246,94 @@ func WriteToHTML() {
 		talk_data.Title = talk.Title
 		talk_data.Host = talk.Host
 		talk_data.Abstract = talk.Abstract
+		talk_data.Location = talk.Location
 		page_talks = append(page_talks, talk_data)
 	}
 
 	data := page_data{
-		Term:  Term,
-		Year:  strconv.Itoa(Year),
-		Talks: page_talks,
+		Term:         currentTerm,
+		Year:         strconv.Itoa(currentYear),
+		LastTermPath: strconv.Itoa(lastYear) + "/" + strings.ToLower(lastTerm),
+		Talks:        page_talks,
 	}
-	path := prefix + "html/Seminar_Page.html"
-	// path := "./html/Seminar_Page.html"
-	t, err := template.ParseFiles(path)
+	pathToTemplate := pathToBinary + "html/Seminar_Page.html"
+	t, err := template.ParseFiles(pathToTemplate)
 	if err != nil {
-		log.Print(err)
+		log.Println("Parsing index page template:", err)
 		return
 	}
-	index_path := prefix + "html/index.html"
-	f, err := os.Create(index_path)
-	if err != nil {
-		log.Println("create file: ", err)
-		return
+
+	index_path := pathToRepo + "index.html"
+	yearPath := pathToRepo + strconv.Itoa(currentYear)
+	termPath := yearPath + "/" + strings.ToLower(currentTerm)
+	termIndexPath := termPath + "/index.html"
+
+	writeIndex := func(path string) {
+		f, err := os.Create(path)
+		if err != nil {
+			log.Println("create file: ", err)
+			return
+		}
+		if path != index_path {
+			data.Prefix = "../../"
+		}
+		err = t.Execute(f, data)
+		if err != nil {
+			log.Println("execute: ", err)
+			return
+		}
+		f.Close()
 	}
-	err = t.Execute(f, data)
-	if err != nil {
-		log.Print("execute: ", err)
-		return
+
+	writeIndex(index_path)
+
+	createDir := func(path string) {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			err := os.Mkdir(path, 0700)
+			if err != nil {
+				log.Println("creating directory: ", err)
+			}
+		}
 	}
-	f.Close()
-	// out, err2 := exec.Command("/bin/bash", "/home/matt/gh_sync.sh").Output()
-	// if err2 != nil {
-	//	log.Fatal(err)
-	// }
-	// log.Print(out)
+
+	createDir(yearPath) // need to create directories one level at a time apparently
+	createDir(termPath)
+
+	writeIndex(termIndexPath)
+
+	updateRepo()
+}
+
+func updateRepo() {
+	gitPull := exec.Command("git", "pull")
+	gitPull.Dir = pathToRepo
+	output, err := gitPull.Output()
+	log.Printf("%s", output)
+	if err != nil {
+		log.Println("git pull: ")
+	}
+
+	gitAdd := exec.Command("git", "add", "-A")
+	gitAdd.Dir = pathToRepo
+	_, err = gitAdd.Output()
+	if err != nil {
+		log.Println("git pull: ")
+	}
+
+	gitCommit := exec.Command("git", "commit", "-m", "'Auto update to repo'")
+	gitCommit.Dir = pathToRepo
+	_, err = gitCommit.Output()
+	if err != nil {
+		log.Println("git pull: ")
+	}
+
+	gitPush := exec.Command("git", "push")
+	gitPush.Dir = pathToRepo
+	output, err = gitPush.Output()
+	log.Printf("%s", output)
+	if err != nil {
+		log.Println("git pull: ")
+	}
 }
 
 func Index(w http.ResponseWriter, r *http.Request) {
@@ -247,50 +342,7 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	talk := Talk{}
-	talks := []Talk{}
-	for rows.Next() {
-		var id int
-		var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, host string
-		err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url, &host)
-		if err != nil {
-			log.Fatal(err)
-		}
-		talk.Id = id
-		s := strings.Split(event_time, "-")
-		if len(s[0]) == 4 {
-			s[0] = "0" + s[0]
-		}
-		event_time = s[0]
-		string_time := event_date + "T" + event_time + ":00.000Z"
-		converted_time, err := time.Parse("2006-01-02T15:04:05.000Z", string_time)
-		if err != nil {
-			log.Fatal(err)
-		}
-		talk.Date = converted_time
-		talk.Upcoming = converted_time.After(time.Now())
-		talk.Date_string = talk.Date.Format("January 02 2006")
-		talk.Year = strconv.Itoa(converted_time.Year())
-		month_num := strconv.Itoa(int(converted_time.Month()))
-		if len(month_num) == 1 {
-			talk.Month = "0" + month_num
-		} else {
-			talk.Month = strconv.Itoa(int(converted_time.Month()))
-		}
-		talk.Month_name = talk.Date.Format("January")
-		talk.Day = strconv.Itoa(converted_time.Day())
-		talk.Time_string = converted_time.Format("15:04")
-		talk.Speaker_first = speaker_first
-		talk.Speaker_last = speaker_last
-		talk.Speaker_url = speaker_url
-		talk.Affiliation = speaker_affiliation
-		talk.Title = title
-		talk.Abstract = abstract
-		talk.Vid_conf_url = vid_conf_url
-		talk.Vid_conf_pw = vid_conf_pw
-		talk.Recording_url = recording_url
-		talks = append(talks, talk)
-	}
+	talks := rowsToTalkSlice(rows)
 	sort.Slice(talks, func(i, j int) bool {
 		return talks[j].Date.Before(talks[i].Date)
 	})
@@ -305,48 +357,7 @@ func Show(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	talk := Talk{}
-	for rows.Next() {
-		var id int
-		var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, host string
-		err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url, &host)
-		if err != nil {
-			log.Fatal(err)
-		}
-		talk.Id = id
-		s := strings.Split(event_time, "-")
-		if len(s[0]) == 4 {
-			s[0] = "0" + s[0]
-		}
-		event_time = s[0]
-		string_time := event_date + "T" + event_time + ":00.000Z"
-		converted_time, err := time.Parse("2006-01-02T15:04:05.000Z", string_time)
-		if err != nil {
-			log.Fatal(err)
-		}
-		talk.Date = converted_time
-		talk.Date_string = talk.Date.Format("January 02 2006")
-		talk.Year = strconv.Itoa(converted_time.Year())
-		month_num := strconv.Itoa(int(converted_time.Month()))
-		if len(month_num) == 1 {
-			talk.Month = "0" + month_num
-		} else {
-			talk.Month = strconv.Itoa(int(converted_time.Month()))
-		}
-		talk.Month_name = talk.Date.Format("January")
-		talk.Day = strconv.Itoa(converted_time.Day())
-		talk.Time_string = converted_time.Format("15:04")
-		talk.Speaker_first = speaker_first
-		talk.Speaker_last = speaker_last
-		talk.Affiliation = speaker_affiliation
-		talk.Title = title
-		talk.Abstract = abstract
-		talk.Speaker_url = speaker_url
-		talk.Vid_conf_url = vid_conf_url
-		talk.Vid_conf_pw = vid_conf_pw
-		talk.Recording_url = recording_url
-		talk.Host = host
-	}
+	talk := rowsToTalkSlice(rows)[0]
 	tmpl.ExecuteTemplate(w, "Show", talk)
 	defer db.Close()
 }
@@ -363,85 +374,52 @@ func Edit(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	talk := Talk{}
-	for rows.Next() {
-		var id int
-		var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, host string
-		err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url, &host)
-		if err != nil {
-			log.Fatal(err)
-		}
-		talk.Id = id
-		s := strings.Split(event_time, "-")
-		if len(s[0]) == 4 {
-			s[0] = "0" + s[0]
-		}
-		event_time = s[0]
-		string_time := event_date + "T" + event_time + ":00.000Z"
-		converted_time, err := time.Parse("2006-01-02T15:04:05.000Z", string_time)
-		if err != nil {
-			log.Fatal(err)
-		}
-		talk.Date = converted_time
-		talk.Date_string = talk.Date.Format("January 02 2006")
-		talk.Year = strconv.Itoa(converted_time.Year())
-		month_num := strconv.Itoa(int(converted_time.Month()))
-		if len(month_num) == 1 {
-			talk.Month = "0" + month_num
-		} else {
-			talk.Month = strconv.Itoa(int(converted_time.Month()))
-		}
-		talk.Month_name = talk.Date.Format("January")
-		talk.Day = strconv.Itoa(converted_time.Day())
-		talk.Time_string = converted_time.Format("15:04")
-		talk.Speaker_first = speaker_first
-		talk.Speaker_last = speaker_last
-		talk.Affiliation = speaker_affiliation
-		talk.Title = title
-		talk.Abstract = abstract
-		talk.Speaker_url = speaker_url
-		talk.Vid_conf_url = vid_conf_url
-		talk.Vid_conf_pw = vid_conf_pw
-		talk.Recording_url = recording_url
-		talk.Host = host
-	}
+	talk := rowsToTalkSlice(rows)[0]
 	tmpl.ExecuteTemplate(w, "Edit", talk)
 	defer db.Close()
+}
+
+func formToTalk(r *http.Request) (talk Talk) {
+	talk = Talk{}
+	talk.Abstract = r.FormValue("abstract")
+	talk.Affiliation = r.FormValue("speaker_affiliation")
+	month := r.FormValue("month")
+	day := r.FormValue("day")
+	if len(day) == 1 {
+		day = "0" + day
+	}
+	year := r.FormValue("year")
+	talk.Date_string = year + "-" + month + "-" + day
+	talk.Location = r.FormValue("location")
+	talk.Recording_url = PrependHTTP(r.FormValue("recording_url"))
+	talk.Host = r.FormValue("host")
+	talk.Title = r.FormValue("title")
+	if talk.Title == "" {
+		talk.Title = "TBA"
+	}
+	talk.Abstract = r.FormValue("abstract")
+	talk.Speaker_first = r.FormValue("speaker_first")
+	if talk.Speaker_first == "" {
+		talk.Speaker_first = "Reserved"
+	}
+	talk.Speaker_last = r.FormValue("speaker_last")
+	talk.Time_string = r.FormValue("time")
+	talk.Speaker_url = PrependHTTP(r.FormValue("speaker_url"))
+	talk.Vid_conf_url = PrependHTTP(r.FormValue("vid_conf_url"))
+	talk.Vid_conf_pw = r.FormValue("vid_conf_pw")
+	return talk
 }
 
 func Insert(w http.ResponseWriter, r *http.Request) {
 	db := dbOpen("talks")
 	if r.Method == "POST" {
-		speaker_first := r.FormValue("speaker_first")
-		if speaker_first == "" {
-			speaker_first = "Reserved"
-		}
-		speaker_last := r.FormValue("speaker_last")
-		event_time := r.FormValue("time")
-		speaker_url := PrependHTTP(r.FormValue("speaker_url"))
-		speaker_affiliation := r.FormValue("speaker_affiliation")
-		vid_conf_url := PrependHTTP(r.FormValue("vid_conf_url"))
-		vid_conf_pw := r.FormValue("vid_conf_pw")
-		recording_url := PrependHTTP(r.FormValue("recording_url"))
-		host := r.FormValue("host")
-		title := r.FormValue("title")
-		abstract := r.FormValue("abstract")
-		if title == "" {
-			title = "TBA"
-		}
-		month := r.FormValue("month")
-		day := r.FormValue("day")
-		if len(day) == 1 {
-			day = "0" + day
-		}
-		year := r.FormValue("year")
-		event_date := year + "-" + month + "-" + day
-		insForm, err := db.Prepare("INSERT INTO scagnt (event_date, time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, host) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
+		talk := formToTalk(r)
+		insForm, err := db.Prepare("INSERT INTO scagnt (event_date, time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, host, location) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)")
 		if err != nil {
 			log.Fatal(err)
 		}
-		insForm.Exec(event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, host)
-		log.Println("INSERT: Name: " + speaker_first + " " + speaker_last + " | Title: " + title)
+		insForm.Exec(talk.Date_string, talk.Time_string, talk.Speaker_first, talk.Speaker_last, talk.Speaker_url, talk.Affiliation, talk.Title, talk.Abstract, talk.Vid_conf_url, talk.Vid_conf_pw, talk.Recording_url, talk.Host, talk.Location)
+		log.Println("INSERT: Name: " + talk.Speaker_first + " " + talk.Speaker_last + " | Title: " + talk.Title)
 	}
 	defer db.Close()
 	WriteToHTML()
@@ -452,36 +430,13 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	db := dbOpen("talks")
 	if r.Method == "POST" {
 		id := r.FormValue("uid")
-		speaker_first := r.FormValue("speaker_first")
-		if speaker_first == "" {
-			speaker_first = "Reserved"
-		}
-		speaker_last := r.FormValue("speaker_last")
-		event_time := r.FormValue("time")
-		speaker_url := PrependHTTP(r.FormValue("speaker_url"))
-		speaker_affiliation := r.FormValue("speaker_affiliation")
-		vid_conf_url := PrependHTTP(r.FormValue("vid_conf_url"))
-		vid_conf_pw := r.FormValue("vid_conf_pw")
-		recording_url := PrependHTTP(r.FormValue("recording_url"))
-		host := r.FormValue("host")
-		title := r.FormValue("title")
-		abstract := r.FormValue("abstract")
-		if title == "" {
-			title = "TBA"
-		}
-		month := r.FormValue("month")
-		day := r.FormValue("day")
-		if len(day) == 1 {
-			day = "0" + day
-		}
-		year := r.FormValue("year")
-		event_date := year + "-" + month + "-" + day
-		insForm, err := db.Prepare("UPDATE scagnt SET event_date=?, time=?, speaker_first=? ,speaker_last=?, speaker_url=?, speaker_affiliation=?, title=?, abstract=?, vid_conf_url=?, vid_conf_pw=?, recording_url=?, host=? WHERE id=?")
+		talk := formToTalk(r)
+		insForm, err := db.Prepare("UPDATE scagnt SET event_date=?, time=?, speaker_first=? ,speaker_last=?, speaker_url=?, speaker_affiliation=?, title=?, abstract=?, vid_conf_url=?, vid_conf_pw=?, recording_url=?, host=?, location=? WHERE id=?")
 		if err != nil {
 			log.Fatal(err)
 		}
-		insForm.Exec(event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, host, id)
-		log.Println("UPDATE: Name: " + speaker_first + " " + speaker_last + " | Title: " + title)
+		insForm.Exec(talk.Date_string, talk.Time_string, talk.Speaker_first, talk.Speaker_last, talk.Speaker_url, talk.Affiliation, talk.Title, talk.Abstract, talk.Vid_conf_url, talk.Vid_conf_pw, talk.Recording_url, talk.Host, talk.Location, id)
+		log.Println("UPDATE: Name: " + talk.Speaker_first + " " + talk.Speaker_last + " | Title: " + talk.Title)
 	}
 	defer db.Close()
 	WriteToHTML()
@@ -495,47 +450,7 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for rows.Next() {
-		var id int
-		var event_date, event_time, speaker_first, speaker_last, speaker_url, speaker_affiliation, title, abstract, vid_conf_url, vid_conf_pw, recording_url, host string
-		err = rows.Scan(&id, &event_date, &event_time, &speaker_first, &speaker_last, &speaker_url, &speaker_affiliation, &title, &abstract, &vid_conf_url, &vid_conf_pw, &recording_url, &host)
-		if err != nil {
-			log.Fatal(err)
-		}
-		trash.Id = id
-		s := strings.Split(event_time, "-")
-		if len(s[0]) == 4 {
-			s[0] = "0" + s[0]
-		}
-		event_time = s[0]
-		string_time := event_date + "T" + event_time + ":00.000Z"
-		converted_time, err := time.Parse("2006-01-02T15:04:05.000Z", string_time)
-		if err != nil {
-			log.Fatal(err)
-		}
-		trash.Date = converted_time
-		trash.Date_string = trash.Date.Format("January 02 2006")
-		trash.Year = strconv.Itoa(converted_time.Year())
-		month_num := strconv.Itoa(int(converted_time.Month()))
-		if len(month_num) == 1 {
-			trash.Month = "0" + month_num
-		} else {
-			trash.Month = strconv.Itoa(int(converted_time.Month()))
-		}
-		trash.Month_name = trash.Date.Format("January")
-		trash.Day = strconv.Itoa(converted_time.Day())
-		trash.Time_string = converted_time.Format("15:04")
-		trash.Speaker_first = speaker_first
-		trash.Speaker_last = speaker_last
-		trash.Affiliation = speaker_affiliation
-		trash.Title = title
-		trash.Abstract = abstract
-		trash.Speaker_url = speaker_url
-		trash.Vid_conf_url = vid_conf_url
-		trash.Vid_conf_pw = vid_conf_pw
-		trash.Recording_url = recording_url
-		trash.Host = host
-	}
+	trash := rowsToTalkSlice(rows)[0]
 	log.Println("Pending deletion: " + trash.Speaker_first + " " + trash.Speaker_last + " | " + trash.Title)
 	tmpl.ExecuteTemplate(w, "Delete", trash)
 	defer db.Close()
@@ -701,12 +616,6 @@ func Attempt(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-
-	check_year() // check the year is between 2021 and 2030
-	check_term() // check the term is either 'Fall' or 'Spring'
-
-	set_term_start()
-	set_term_end()
 
 	file, err := os.OpenFile("logs", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
