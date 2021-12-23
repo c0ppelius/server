@@ -5,7 +5,9 @@ Description=SCAGNT data server
 Type=simple
 Restart=always
 RestartSec=5s
-ExecStart=/home/server/server
+User=matt
+WorkingDirectory=/home/matt/server
+ExecStart=/home/matt/server/server
 
 [Install]
 WantedBy=multi-user.target

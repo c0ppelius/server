@@ -47,11 +47,12 @@ var term_start string
 var term_end string
 
 // we want the program to know its path in the file system and to instantiate the term, year, and repo variables when called
-func init() {
-	e, _ := os.Executable()          // retrieves the path to the binary including the filename itself
-	pathToBinary = path.Dir(e) + "/" // strips the filename only
-	setTermsYearsRepoPath()
-}
+// func init() {
+//	e, _ := os.Executable()          // retrieves the path to the binary including the filename itself
+//	pathToBinary = path.Dir(e) + "/" // strips the filename only
+//	println(pathToBinary)
+//	setTermsYearsRepoPath()
+// }
 
 // this sets/resets the term, year, and path variables
 func setTermsYearsRepoPath() {
@@ -310,21 +311,21 @@ func updateRepo() {
 	output, err := gitPull.Output()
 	log.Printf("%s", output)
 	if err != nil {
-		log.Println("git pull: ")
+		log.Println("git pull: ", err)
 	}
 
 	gitAdd := exec.Command("git", "add", "-A")
 	gitAdd.Dir = pathToRepo
 	_, err = gitAdd.Output()
 	if err != nil {
-		log.Println("git pull: ")
+		log.Println("git add: ", err)
 	}
 
 	gitCommit := exec.Command("git", "commit", "-m", "'Auto update to repo'")
 	gitCommit.Dir = pathToRepo
 	_, err = gitCommit.Output()
 	if err != nil {
-		log.Println("git pull: ")
+		log.Println("git commit: ", err)
 	}
 
 	gitPush := exec.Command("git", "push")
@@ -332,7 +333,7 @@ func updateRepo() {
 	output, err = gitPush.Output()
 	log.Printf("%s", output)
 	if err != nil {
-		log.Println("git pull: ")
+		log.Println("git push: ", err)
 	}
 }
 
@@ -617,7 +618,7 @@ func Attempt(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
-	file, err := os.OpenFile("logs", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	file, err := os.OpenFile("logs", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -627,6 +628,11 @@ func main() {
 	//     WriteTimeout: 10 * time.Second,
 	//     IdleTimeout:  120 * time.Second,
 	// }
+
+	e, _ := os.Executable()          // retrieves the path to the binary including the filename itself
+	pathToBinary = path.Dir(e) + "/" // strips the filename only
+	println(pathToBinary)
+	setTermsYearsRepoPath()
 
 	fmt.Println("Server started")
 	log.Println("Server started on: http://localhost" + port)
