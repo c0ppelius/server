@@ -46,13 +46,11 @@ var pathToRepo string
 var term_start string
 var term_end string
 
-// we want the program to know its path in the file system and to instantiate the term, year, and repo variables when called
-// func init() {
-//	e, _ := os.Executable()          // retrieves the path to the binary including the filename itself
-//	pathToBinary = path.Dir(e) + "/" // strips the filename only
-//	println(pathToBinary)
-//	setTermsYearsRepoPath()
-// }
+// set path to binary
+func setPathToBinary() {
+	e, _ := os.Executable()          // retrieves the path to the binary including the filename itself
+	pathToBinary = path.Dir(e) + "/" // strips the filename only
+}
 
 // this sets/resets the term, year, and path variables
 func setTermsYearsRepoPath() {
@@ -302,7 +300,7 @@ func WriteToHTML() {
 
 	writeIndex(termIndexPath)
 
-	updateRepo()
+	go updateRepo()
 }
 
 func updateRepo() {
@@ -616,22 +614,18 @@ func Attempt(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func main() {
-
+func setLogFile() {
 	file, err := os.OpenFile("logs", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.SetOutput(file)
-	// srv := &http.Server{
-	//     ReadTimeout:  5 * time.Second,
-	//     WriteTimeout: 10 * time.Second,
-	//     IdleTimeout:  120 * time.Second,
-	// }
+}
 
-	e, _ := os.Executable()          // retrieves the path to the binary including the filename itself
-	pathToBinary = path.Dir(e) + "/" // strips the filename only
-	println(pathToBinary)
+func main() {
+
+	setLogFile()
+	setPathToBinary()
 	setTermsYearsRepoPath()
 
 	fmt.Println("Server started")
@@ -646,7 +640,7 @@ func main() {
 	http.HandleFunc("/update", auth(Update))
 	http.HandleFunc("/delete", auth(Delete))
 	http.HandleFunc("/confirmdeletionbesure", ConfirmDelete)
-	err = http.ListenAndServe(port, nil)
+	err := http.ListenAndServe(port, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
