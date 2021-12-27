@@ -14,3 +14,4 @@ Beyond the standard library, the server uses the [SQLite driver from ModernC](ht
 To do:
 - integrate with OAuth2 for better authentication 
 - clean up and separate the code into some sub-packages 
+- use the optional types from database/sql
