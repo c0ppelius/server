@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -20,6 +21,8 @@ import (
 	// "github.com/gobwas/glob/util/strings"
 	// _ "github.com/mattn/go-sqlite3"
 	_ "modernc.org/sqlite"
+
+	"gopkg.in/cas.v2"
 )
 
 const (
@@ -336,6 +339,10 @@ func updateRepo() {
 }
 
 func Index(w http.ResponseWriter, r *http.Request) {
+	if !cas.IsAuthenticated(r) {
+		cas.RedirectToLogin(w, r)
+		return
+	}
 	db := dbOpen("talks")
 	rows, err := db.Query("SELECT * FROM scagnt ORDER BY id DESC")
 	if err != nil {
@@ -622,15 +629,24 @@ func setLogFile() {
 	log.SetOutput(file)
 }
 
+var casURL = "https://casserver.herokuapp.com/cas"
+
+// var casURL = "https://cas-qa.auth.sc.edu/cas"
+
 func main() {
 
 	setLogFile()
-	setPathToBinary()
+	pathToBinary = "/Users/matt/GitHub/server/"
 	setTermsYearsRepoPath()
+
+	url, _ := url.Parse(casURL)
+	client := cas.NewClient(&cas.Options{
+		URL: url,
+	})
 
 	fmt.Println("Server started")
 	log.Println("Server started on: http://localhost" + port)
-	http.HandleFunc("/", auth(Index))
+	http.Handle("/", client.HandleFunc(Index))
 	http.HandleFunc("/login", Login)
 	http.HandleFunc("/attempt", Attempt)
 	http.HandleFunc("/show", auth(Show))
@@ -640,6 +656,7 @@ func main() {
 	http.HandleFunc("/update", auth(Update))
 	http.HandleFunc("/delete", auth(Delete))
 	http.HandleFunc("/confirmdeletionbesure", ConfirmDelete)
+
 	err := http.ListenAndServe(port, nil)
 	if err != nil {
 		log.Fatal(err)
